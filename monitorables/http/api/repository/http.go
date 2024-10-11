@@ -2,7 +2,7 @@ package repository
 
 import (
 	"crypto/tls"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
@@ -18,8 +18,18 @@ type (
 )
 
 func NewHTTPRepository(config *config.HTTP) api.Repository {
+	var certificates []tls.Certificate
+
+	if config.Certificate != "" && config.Key != "" {
+		cert, error := tls.LoadX509KeyPair(config.Certificate, config.Key)
+
+		if error == nil {
+			certificates = append(certificates, cert)
+		}
+	}
+
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.SSLVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !config.SSLVerify, Certificates: certificates},
 	}
 	client := &http.Client{Transport: tr, Timeout: time.Duration(config.Timeout) * time.Millisecond}
 
@@ -33,7 +43,7 @@ func (r *httpRepository) Get(url string) (response *models.Response, err error) 
 	}
 	defer resp.Body.Close()
 
-	bytes, err := ioutil.ReadAll(resp.Body)
+	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
